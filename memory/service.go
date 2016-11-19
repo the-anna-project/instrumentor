@@ -77,7 +77,7 @@ func (s *service) Metadata() map[string]string {
 	return nil
 }
 
-func (s *service) NewKey(s ...string) string {
+func (s *service) NewKey(str ...string) string {
 	return ""
 }
 

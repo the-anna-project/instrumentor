@@ -1,4 +1,5 @@
-// Package prometheus implements spec.InstrumentorService and provides instrumentation
+// Package prometheus implements
+// github.com/the-anna-project/instrumentor.Service and provides instrumentation
 // primitives to manage application metrics.
 package prometheus
 
@@ -10,68 +11,83 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	objectspec "github.com/the-anna-project/spec/object"
-	servicespec "github.com/the-anna-project/spec/service"
+	"github.com/the-anna-project/instrumentor"
 )
 
-// New creates a new pronetheus instrumentor service.
-func New() servicespec.InstrumentorService {
-	return &service{}
+// Config represents the configuration used to create a new instrumentor
+// service.
+type Config struct {
+	// Settings.
+	HTTPEndpoint string
+	HTTPHandler  http.Handler
+	Prefixes     []string
+}
+
+// DefaultConfig provides a default configuration to create a new instrumentor
+// service by best effort.
+func DefaultConfig() Config {
+	return Config{
+		// Settings.
+		HTTPEndpoint: "/metrics",
+		HTTPHandler:  prometheus.Handler(),
+		Prefixes:     []string{},
+	}
+}
+
+// New creates a new instrumentor service.
+func New(config Config) (instrumentor.Service, error) {
+	// Settings.
+	if config.HTTPEndpoint == "" {
+		return nil, maskAnyf(invalidConfigError, "HTTP endpoint must not be empty")
+	}
+	if config.HTTPHandler == nil {
+		return nil, maskAnyf(invalidConfigError, "HTTP handler must not be empty")
+	}
+	if config.Prefixes == nil {
+		return nil, maskAnyf(invalidConfigError, "prefixes must not be empty")
+	}
+
+	newService := &service{
+		// Internals.
+		counters:   map[string]instrumentor.Counter{},
+		gauges:     map[string]instrumentor.Gauge{},
+		histograms: map[string]instrumentor.Histogram{},
+		mutex:      sync.Mutex{},
+
+		// Settings.
+		httpEndpoint: config.HTTPEndpoint,
+		httpHandler:  config.HTTPHandler,
+		prefixes:     config.Prefixes,
+	}
+
+	return newService, nil
 }
 
 type service struct {
-	// Dependencies.
-
-	serviceCollection servicespec.ServiceCollection
+	// Internals.
+	counters   map[string]instrumentor.Counter
+	gauges     map[string]instrumentor.Gauge
+	histograms map[string]instrumentor.Histogram
+	mutex      sync.Mutex
 
 	// Settings.
 
-	counters   map[string]objectspec.InstrumentorCounter
-	gauges     map[string]objectspec.InstrumentorGauge
-	histograms map[string]objectspec.InstrumentorHistogram
-	// httpEndpoint represents the HTTP endpoint used to register the
-	// httpHandler. In the context of Prometheus this is usually /metrics.
+	// httpEndpoint represents the HTTP endpoint used to register the httpHandler.
+	// In the context of Prometheus this is usually /metrics.
 	httpEndpoint string
 	// httpHandler represents the HTTP handler used to register the Prometheus
 	// registry in the HTTP server.
 	httpHandler http.Handler
-	metadata    map[string]string
-	mutex       sync.Mutex
-	// prefixes represents the Instrumentor's ordered prefixes. It is recommended
-	// to use the following prefixes.
-	//
-	//     []string{"anna", "<prefix>"}
-	//
+	// prefixes represents the Instrumentor's ordered prefixes.
 	prefixes []string
 }
 
-func (s *service) Boot() {
-	id, err := s.Service().ID().New()
-	if err != nil {
-		panic(err)
-	}
-	s.metadata = map[string]string{
-		"id":   id,
-		"kind": "prometheus",
-		"name": "instrumentor",
-		"type": "service",
-	}
-
-	s.counters = map[string]objectspec.InstrumentorCounter{}
-	s.gauges = map[string]objectspec.InstrumentorGauge{}
-	s.histograms = map[string]objectspec.InstrumentorHistogram{}
-	s.httpEndpoint = "/metrics"
-	s.httpHandler = prometheus.Handler()
-	s.mutex = sync.Mutex{}
-	s.prefixes = []string{"anna"}
-}
-
 func (s *service) ExecFunc(key string, action func() error) error {
-	h, err := s.GetHistogram(s.NewKey(key, "durations", "histogram", "milliseconds"))
+	h, err := s.Histogram(s.NewKey(key, "durations", "histogram", "milliseconds"))
 	if err != nil {
 		return maskAny(err)
 	}
-	c, err := s.GetCounter(s.NewKey(key, "errors", "counter", "total"))
+	c, err := s.Counter(s.NewKey(key, "errors", "counter", "total"))
 	if err != nil {
 		return maskAny(err)
 	}
@@ -91,7 +107,7 @@ func (s *service) ExecFunc(key string, action func() error) error {
 	return nil
 }
 
-func (s *service) GetCounter(key string) (objectspec.InstrumentorCounter, error) {
+func (s *service) Counter(key string) (instrumentor.Counter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -116,7 +132,7 @@ func (s *service) GetCounter(key string) (objectspec.InstrumentorCounter, error)
 	return newCounter, nil
 }
 
-func (s *service) GetGauge(key string) (objectspec.InstrumentorGauge, error) {
+func (s *service) Gauge(key string) (instrumentor.Gauge, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -141,7 +157,7 @@ func (s *service) GetGauge(key string) (objectspec.InstrumentorGauge, error) {
 	return newGauge, nil
 }
 
-func (s *service) GetHistogram(key string) (objectspec.InstrumentorHistogram, error) {
+func (s *service) Histogram(key string) (instrumentor.Histogram, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -166,32 +182,20 @@ func (s *service) GetHistogram(key string) (objectspec.InstrumentorHistogram, er
 	return newHistogram, nil
 }
 
-func (s *service) GetHTTPEndpoint() string {
+func (s *service) HTTPEndpoint() string {
 	return s.httpEndpoint
 }
 
-func (s *service) GetHTTPHandler() http.Handler {
+func (s *service) HTTPHandler() http.Handler {
 	return s.httpHandler
 }
 
-func (s *service) GetPrefixes() []string {
+func (s *service) Prefixes() []string {
 	return s.prefixes
-}
-
-func (s *service) Metadata() map[string]string {
-	return s.metadata
 }
 
 func (s *service) NewKey(str ...string) string {
 	return strings.Join(append(s.prefixes, str...), "_")
-}
-
-func (s *service) Service() servicespec.ServiceCollection {
-	return s.serviceCollection
-}
-
-func (s *service) SetServiceCollection(sc servicespec.ServiceCollection) {
-	s.serviceCollection = sc
 }
 
 func (s *service) WrapFunc(key string, action func() error) func() error {

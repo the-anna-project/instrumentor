@@ -1,25 +1,34 @@
-// Package memory mocks spec.InstrumentorService and does effectively nothing. It
-// is only used for default configurations that require a satisfied
-// instrumentation implementation. This should then be overwritten with a valid
-// implementation if required.
+// Package memory mocks github.com/the-anna-project/instrumentor.Service and
+// does effectively nothing. It is only used for default configurations that
+// require a satisfied instrumentation implementation. This should then be
+// overwritten with a valid implementation if required.
 package memory
 
 import (
 	"net/http"
 
-	objectspec "github.com/the-anna-project/spec/object"
-	servicespec "github.com/the-anna-project/spec/service"
+	"github.com/the-anna-project/instrumentor"
 )
 
-// New creates a new memory instrumentation service.
-func New() servicespec.InstrumentorService {
-	return &service{}
+// Config represents the configuration used to create a new instrumentor
+// service.
+type Config struct {
+}
+
+// DefaultConfig provides a default configuration to create a new instrumentor
+// service by best effort.
+func DefaultConfig() Config {
+	return Config{}
+}
+
+// New creates a new instrumentor service.
+func New(config Config) (instrumentor.Service, error) {
+	newService := &service{}
+
+	return newService, nil
 }
 
 type service struct {
-}
-
-func (s *service) Boot() {
 }
 
 func (s *service) ExecFunc(key string, action func() error) error {
@@ -31,7 +40,7 @@ func (s *service) ExecFunc(key string, action func() error) error {
 	return nil
 }
 
-func (s *service) GetCounter(key string) (objectspec.InstrumentorCounter, error) {
+func (s *service) Counter(key string) (instrumentor.Counter, error) {
 	newConfig := DefaultCounterConfig()
 	newCounter, err := NewCounter(newConfig)
 	if err != nil {
@@ -41,7 +50,7 @@ func (s *service) GetCounter(key string) (objectspec.InstrumentorCounter, error)
 	return newCounter, nil
 }
 
-func (s *service) GetGauge(key string) (objectspec.InstrumentorGauge, error) {
+func (s *service) Gauge(key string) (instrumentor.Gauge, error) {
 	newConfig := DefaultGaugeConfig()
 	newGauge, err := NewGauge(newConfig)
 	if err != nil {
@@ -51,7 +60,7 @@ func (s *service) GetGauge(key string) (objectspec.InstrumentorGauge, error) {
 	return newGauge, nil
 }
 
-func (s *service) GetHistogram(key string) (objectspec.InstrumentorHistogram, error) {
+func (s *service) Histogram(key string) (instrumentor.Histogram, error) {
 	newConfig := DefaultHistogramConfig()
 	newHistogram, err := NewHistogram(newConfig)
 	if err != nil {
@@ -61,31 +70,20 @@ func (s *service) GetHistogram(key string) (objectspec.InstrumentorHistogram, er
 	return newHistogram, nil
 }
 
-func (s *service) GetHTTPEndpoint() string {
+func (s *service) HTTPEndpoint() string {
 	return ""
 }
 
-func (s *service) GetHTTPHandler() http.Handler {
+func (s *service) HTTPHandler() http.Handler {
 	return nil
 }
 
-func (s *service) GetPrefixes() []string {
-	return nil
-}
-
-func (s *service) Metadata() map[string]string {
+func (s *service) Prefixes() []string {
 	return nil
 }
 
 func (s *service) NewKey(str ...string) string {
 	return ""
-}
-
-func (s *service) Service() servicespec.ServiceCollection {
-	return nil
-}
-
-func (s *service) SetServiceCollection(sc servicespec.ServiceCollection) {
 }
 
 func (s *service) WrapFunc(key string, action func() error) func() error {

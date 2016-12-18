@@ -1,7 +1,7 @@
 package memory
 
 import (
-	objectspec "github.com/the-anna-project/spec/object"
+	"github.com/the-anna-project/instrumentor"
 )
 
 // GaugeConfig represents the configuration used to create a new memory gauge
@@ -18,7 +18,7 @@ func DefaultGaugeConfig() GaugeConfig {
 }
 
 // NewGauge creates a new configured memory gauge object.
-func NewGauge(config GaugeConfig) (objectspec.InstrumentorGauge, error) {
+func NewGauge(config GaugeConfig) (instrumentor.Gauge, error) {
 	newGauge := &gauge{
 		GaugeConfig: config,
 	}

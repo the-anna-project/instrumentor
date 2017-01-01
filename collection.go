@@ -21,8 +21,9 @@ const (
 	KindPrometheus = "prometheus"
 )
 
-// Config represents the configuration used to create a new collection.
-type Config struct {
+// CollectionConfig represents the configuration used to create a new
+// collection.
+type CollectionConfig struct {
 	// Settings.
 	HTTPEndpoint string
 	HTTPHandler  http.Handler
@@ -30,10 +31,10 @@ type Config struct {
 	Prefixes     []string
 }
 
-// DefaultConfig provides a default configuration to create a new collection by
-// best effort.
-func DefaultConfig() Config {
-	return Config{
+// DefaultCollectionConfig provides a default configuration to create a new
+// collection by best effort.
+func DefaultCollectionConfig() CollectionConfig {
+	return CollectionConfig{
 		// Settings.
 		HTTPEndpoint: "/metrics",
 		HTTPHandler:  prometheus.Handler(),
@@ -42,8 +43,8 @@ func DefaultConfig() Config {
 	}
 }
 
-// New creates a new configured storage Collection.
-func New(config Config) (*Collection, error) {
+// NewCollection creates a new configured storage Collection.
+func NewCollection(config CollectionConfig) (*Collection, error) {
 	// Settings.
 	if config.Kind == "" {
 		return nil, maskAnyf(invalidConfigError, "kind must not be empty")
